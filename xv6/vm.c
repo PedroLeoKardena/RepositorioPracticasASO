@@ -42,13 +42,17 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
   if(*pde & PTE_P){
     pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
   } else {
+    //Si No se da PTE_P significa que la segunda tabla no está presente. Entonces vemos si tenemos permisos para crearla (flag alloc).
+    //Entonces si tenemos creamos pgtab y la rellenamos.
     if(!alloc || (pgtab = (pte_t*)kalloc()) == 0)
       return 0;
     // Make sure all those PTE_P bits are zero.
+    // Rellenar pgtag.
     memset(pgtab, 0, PGSIZE);
     // The permissions here are overly generous, but they can
     // be further restricted by the permissions in the page table
     // entries, if necessary.
+    // pde pasa a apuntar al inicio de la siguiente pagina con permisos de Presencia, Escritura y Usuario
     *pde = V2P(pgtab) | PTE_P | PTE_W | PTE_U;
   }
   return &pgtab[PTX(va)];
