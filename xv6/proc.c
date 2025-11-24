@@ -162,6 +162,7 @@ growproc(int n)
   struct proc *curproc = myproc();
 
   sz = curproc->sz;
+  //Si n > 0, significa que queremos crecer. Si n < 0 significa que queremos decrecer la memoria asignada en el heap.
   if(n > 0){
     if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
@@ -170,6 +171,8 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
+  //lcr3 : pasamos una tabla de paginas en fisico y la carga. Esto permite refrescar la cache TLB. Esto realmente solo deberia hacerse cuando decrece. Cuando crece las nuevas paginas
+  //ya se refrescaran cuando se utilicen.
   lcr3(V2P(curproc->pgdir));  // Invalidate TLB.
   return 0;
 }

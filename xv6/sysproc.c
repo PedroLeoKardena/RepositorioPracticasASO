@@ -58,14 +58,18 @@ int
 sys_sbrk(void)
 {
   int addr;
-  int n;
+  int n; //size a crecer el nuevo proceso
 
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
+  //sz proceso = addr. Devolvemos el size del proceso por que indica la direccion de memoria que apunta al comienzo de nuestro espacio en memoria (tras hacer
+		       //malloc).
+  //growproc hace crecer el proceso en n bytes. Ejercicio 1 nos obliga a no usarlo.
   //if(growproc(n) < 0)
-    //return -1;
-  myproc()->sz += n;
+  //  return -1;
+  //Como no lo usamos, si hacemos solo myproc()->sz+=n esto aumenta sz pero no aparecera en la tabla de paginas. Lo que debemos hacer es forzar el error de tabla de paginas.
+  myproc()->sz+=n;
   return addr;
 }
 
