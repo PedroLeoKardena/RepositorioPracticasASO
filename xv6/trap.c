@@ -77,7 +77,10 @@ trap(struct trapframe *tf)
             cpuid(), tf->cs, tf->eip);
     lapiceoi();
     break;
-
+  case T_PGFLT:
+   char* mem = kalloc();
+    mappages(myproc()->pgdir, (char *)PGROUNDDOWN(rcr2()), PGSIZE, V2P(mem), PTE_W|PTE_U);
+    break;
   //PAGEBREAK: 13
   default:
     //myproc() == 0 es modo kernel. Si salta un trap en modo kernel -> panic = matar todos los procesos.
@@ -92,14 +95,12 @@ trap(struct trapframe *tf)
             "eip 0x%x addr 0x%x--kill proc\n",
             myproc()->pid, myproc()->name, tf->trapno,
             tf->err, cpuid(), tf->eip, rcr2());
-    
     //Aqui que es cuando salta la excepcion por falta de memoria debemos dar la memoria (tratar el error de paginacion) 
     //Nos basamos en codigo allocuvm
     
-    char *mem = kalloc();
+    //char *mem = kalloc(); Preguntar si es necesario
     //mappages en el que pasamos el procesos rcr2() = 4004
-    mappages(myproc()->pgdir,(char *)PGROUNDDOWN(rcr2()), PGSIZE, V2P(mem), PTE_W|PTE_U);
-
+    //mappages(myproc()->pgdir,(char *)PGROUNDDOWN(rcr2()), PGSIZE, V2P(mem), PTE_W|PTE_U);
     myproc()->killed = 1;
   }
 
