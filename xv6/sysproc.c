@@ -23,6 +23,7 @@ sys_exit(void)
   //Nosotros lo que tenemos que hacer es modificar esta llamada exit para que reciba el parametro status. Esta llamada es invocada por sys_exit (salida correcta) y por trap 
   //(exit "incorrecto") funcion en trap.c, y dependiendo de quien llame lo tratamos de una manera u otra. Hay que usar las macros definidas en user/user.h.
   //Una vez que hayamos tratado todo esto entonces podremos trabajar con sys_wait.
+  myproc()->exitstatus = (status & 0xff) << 8;  // Se pone el estado del proceso en los 8 bits mas significativos. (Porque los menos significativos se usan para el trap).
   exit();
   return 0;  // not reached
 }
@@ -31,11 +32,13 @@ int
 sys_wait(void)
 {
   int *status;
-  
-  if(argptr(0, (void**)&status, sizeof(int)) < 0)
+  int arg;
+  if(argint(0, &arg) < 0)
     return -1;
-
-  return wait();
+  status = (int *)arg;
+  if(status!=0 && argptr(0, (void**)&status, sizeof(int)) < 0)
+    return -1;  
+  return wait(status);
 }
 
 int
