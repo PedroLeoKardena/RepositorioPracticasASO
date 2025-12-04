@@ -98,6 +98,8 @@ trap(struct trapframe *tf)
       cprintf("pid %d %s: segfault lazy alloc failed va=0x%x ip=0x%x\n",
               myproc()->pid, myproc()->name, va, tf->eip);
       myproc()->killed = 1; //Matamos el proceso
+      //Falla en PG_FAULT -> debemos asignarle código de salida de pg_fault.
+      myproc()->exitstatus = tf->trapno+1;
       break;
     }
 
@@ -109,6 +111,7 @@ trap(struct trapframe *tf)
     if(mem == 0){
       cprintf("lazy alloc: out of memory\n");
       myproc()->killed = 1;
+      myproc()->exitstatus = tf->trapno+1;
       break;
     }
     //Limpiamos la página.
@@ -122,6 +125,7 @@ trap(struct trapframe *tf)
       cprintf("lazy alloc: mappages failed\n");
       kfree(mem);
       myproc()->killed = 1;
+      myproc()->exitstatus = tf->trapno+1;
       break;
     }
     
