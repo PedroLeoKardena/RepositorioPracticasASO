@@ -83,7 +83,7 @@ trap(struct trapframe *tf)
     break;
   //PAGEBREAK: 13
   default:
-    //myproc() == 0 es modo kernel. Si salta un trap en modo kernel -> panic = matar todos los procesos.
+  //myproc() == 0 es modo kernel. Si salta un trap en modo kernel -> panic = matar todos los procesos.
     if(myproc() == 0 || (tf->cs&3) == 0){
       // In kernel, it must be our mistake.
       cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
@@ -95,13 +95,8 @@ trap(struct trapframe *tf)
             "eip 0x%x addr 0x%x--kill proc\n",
             myproc()->pid, myproc()->name, tf->trapno,
             tf->err, cpuid(), tf->eip, rcr2());
-    //Aqui que es cuando salta la excepcion por falta de memoria debemos dar la memoria (tratar el error de paginacion) 
-    //Nos basamos en codigo allocuvm
-    
-    //char *mem = kalloc(); Preguntar si es necesario
-    //mappages en el que pasamos el procesos rcr2() = 4004
-    //mappages(myproc()->pgdir,(char *)PGROUNDDOWN(rcr2()), PGSIZE, V2P(mem), PTE_W|PTE_U);
     myproc()->killed = 1;
+    myproc()->exitstatus = ((tf->trapno + 1) & 0x7f);   // Codigo de salida por trap+1 con los 7 menos significativos
   }
 
   // Force process exit if it has been killed and is in user space.
@@ -109,7 +104,7 @@ trap(struct trapframe *tf)
   // until it gets to the regular system call return.)
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();
-
+    
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
   if(myproc() && myproc()->state == RUNNING &&

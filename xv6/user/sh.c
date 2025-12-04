@@ -166,7 +166,14 @@ main(void)
     }
     if(fork1() == 0)
       runcmd(parsecmd(buf));
-    wait(NULL);
+    int status;
+    wait(&status);
+    if(WIFEXITED(status)){
+      printf(1, "Output code: %d\n", WEXITSTATUS(status));
+    } else if(WIFSIGNALED(status)){
+      printf(1, "Output code: trap %d\n", WEXITTRAP(status));
+    }
+
   }
   exit(0);
 }

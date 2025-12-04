@@ -23,6 +23,7 @@ sys_exit(void)
   //Nosotros lo que tenemos que hacer es modificar esta llamada exit para que reciba el parametro status. Esta llamada es invocada por sys_exit (salida correcta) y por trap 
   //(exit "incorrecto") funcion en trap.c, y dependiendo de quien llame lo tratamos de una manera u otra. Hay que usar las macros definidas en user/user.h.
   //Una vez que hayamos tratado todo esto entonces podremos trabajar con sys_wait.
+  myproc()->exitstatus = (status & 0xff) << 8;  // Se pone el estado del proceso en los 8 bits mas significativos. (Porque los menos significativos se usan para el trap).
   exit();
   return 0;  // not reached
 }
@@ -31,11 +32,13 @@ int
 sys_wait(void)
 {
   int *status;
-  
-  if(argptr(0, (void**)&status, sizeof(int)) < 0)
+  int arg;
+  if(argint(0, &arg) < 0)
     return -1;
-
-  return wait();
+  status = (int *)arg;
+  if(status!=0 && argptr(0, (void**)&status, sizeof(int)) < 0)
+    return -1;  
+  return wait(status);
 }
 
 int
@@ -66,8 +69,8 @@ sys_sbrk(void)
   //sz proceso = addr. Devolvemos el size del proceso por que indica la direccion de memoria que apunta al comienzo de nuestro espacio en memoria (tras hacer
 		       //malloc).
   //growproc hace crecer el proceso en n bytes. Ejercicio 1 nos obliga a no usarlo.
-  //if(growproc(n) < 0)
-  //  return -1;
+  if(growproc(n) < 0)
+    return -1;
   //Como no lo usamos, si hacemos solo myproc()->sz+=n esto aumenta sz pero no aparecera en la tabla de paginas. Lo que debemos hacer es forzar el error de tabla de paginas.
   myproc()->sz+=n;
   return addr;

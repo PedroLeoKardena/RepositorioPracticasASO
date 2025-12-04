@@ -45,4 +45,3 @@ extern int atoi(const char*);
 #define WEXITSTATUS(status) (((status) & 0xff00) >> 8)
 #define WIFSIGNALED(status) (((status) & 0x7f) != 0)
 #define WEXITTRAP(status) (((status) & 0x7f) - 1)
-
