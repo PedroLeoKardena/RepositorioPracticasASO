@@ -329,10 +329,23 @@ copyuvm(pde_t *pgdir, uint sz)
   if((d = setupkvm()) == 0)
     return 0;
   for(i = 0; i < sz; i += PGSIZE){
+    //Antes, comprobamos si no existe una entrada de tabla de páginas (PTE) para la dirección virtual i dentro del page directory pgdir.
+    //Antes, si esto no se daba, habia que lanzar el panic, pero como ahora estamos con la reserva de páginas bajo demanda simplemente
+    //podemos continuar.
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
-      panic("copyuvm: pte should exist");
+      //panic("copyuvm: pte should exist");
+      continue;
+    
+    //Ahora, si la pagina no está presente (PTE_P), es por que estamos trabajando con una pagina lazy (pagina reservada por pg_fault)
+    //En este caso, ahora simplemente podemos saltar esta comprobación, ya que el hijo heredará el tamaño 'sz' pero sin la asignación física.
     if(!(*pte & PTE_P))
-      panic("copyuvm: page not present");
+      //panic("copyuvm: page not present");
+      continue;
+
+    //Estas dos comprobaciones anteriores las haciamos por que era necesario con la asignación de páginas previa:
+    //Si una pagina no esta presente o si una entrada de la tabla de paginas no existe, con la asignación de antes,
+    //debía saltar el panic, pero ahora no es realmente necesario, ya que es algo normal, que forma parte del tipo de
+    //asignación de páginas que hacemos ahora.
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
     if((mem = kalloc()) == 0)

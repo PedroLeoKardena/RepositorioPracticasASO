@@ -66,14 +66,25 @@ sys_sbrk(void)
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-  //sz proceso = addr. Devolvemos el size del proceso por que indica la direccion de memoria que apunta al comienzo de nuestro espacio en memoria (tras hacer
-		       //malloc).
-  //growproc hace crecer el proceso en n bytes. Ejercicio 1 nos obliga a no usarlo.
-  if(growproc(n) < 0)
-    return -1;
-  //Como no lo usamos, si hacemos solo myproc()->sz+=n esto aumenta sz pero no aparecera en la tabla de paginas. Lo que debemos hacer es forzar el error de tabla de paginas.
-  myproc()->sz+=n;
-  return addr;
+  //sz proceso = addr. Devolvemos el size del proceso por que indica la direccion de memoria que apunta al 
+  //comienzo de nuestro espacio en memoria (tras hacer malloc).
+  //growproc hace crecer el proceso en n bytes. Ejercicio 1 nos obliga a no usarlo. 
+  
+  //Sin embargo, es necesario en el ejercicio 2, para cuando n < 0. 
+  //Si n > 0: No debemos llamar a growproc. Solo aumentamos el tamaño lógico (lazy allocation).
+  if (n > 0)
+  {
+    //Como no lo usamos, si hacemos solo myproc()->sz+=n esto aumenta sz pero no aparecera en la tabla de paginas. Lo que debemos hacer es forzar el error de tabla de paginas.
+    myproc()->sz+=n;
+  }
+  else if (n < 0){
+    //Si n < 0: Debemos liberar memoria inmediatamente. Aquí sí podemos usar growproc.
+    //Con esta implementación growproc hara un dealloc.
+    //Con esto conseguimos resolver aquellos casos en los que se llama a sbrk() con un argumento negativo.
+    if(growproc(n) < 0)
+      return -1;
+  }
+  return addr;  
 }
 
 int

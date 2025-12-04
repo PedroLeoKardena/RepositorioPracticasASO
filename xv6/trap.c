@@ -78,12 +78,61 @@ trap(struct trapframe *tf)
     lapiceoi();
     break;
   case T_PGFLT:
+    //Aqui que es cuando salta la excepcion por falta de memoria debemos dar la memoria (tratar el error de paginacion) 
+
+    uint va = rcr2(); // Dirección virtual que causó el fallo
+    //Explicación Ejercicio 2:
+    //En el ejercicio 2 tenemos que asegurarnos de hacer ciertas validaciones de seguridad:
+    //Primero: El proceso debe existir.
+    //Segundo: va < p->sz: La dirección debe estar dentro del tamaño declarado del proceso.
+    //Tercero: va >= PGROUNDDOWN(tf->esp): Protección de la página de guarda.
+
+    //Si la dirección está DEBAJO de la pila, es un desbordamiento de pila, no memoria heap válida.
+    //Comprobamos myproc() == 0, que la direccion virtual no supere el tamaño declarado del proceso 
+    //y por ultimo nos aseguramos que el stack pointer (myproc()->tf->esp). Esta ultima comprobación soluciona el problema:
+    //Comprobar y manejar los casos de fallos en los que la página inválida está debajo de la pila.
+    
+    //Estas comprobacioens basicamente lo que nos permiten es asegurarnos de que: la direccion virtual no supere la memoria
+    //que el proceso a pedido a través del sys_sbrk y que no se vaya por debajo de la pila (recordar que la pila crece hacia arriba)
+    if(myproc() == 0 || va >= myproc()->sz || va < PGROUNDDOWN(myproc()->tf->esp)){
+      cprintf("pid %d %s: segfault lazy alloc failed va=0x%x ip=0x%x\n",
+              myproc()->pid, myproc()->name, va, tf->eip);
+      myproc()->killed = 1; //Matamos el proceso
+      //Falla en PG_FAULT -> debemos asignarle código de salida de pg_fault.
+      myproc()->exitstatus = tf->trapno+1;
+      break;
+    }
+
+    //Nos basamos en codigo allocuvm
+    //char *mem = kalloc(); Preguntar si es necesario
+    //Ahora podemos intentar reservar memoria fisica:
     char* mem = kalloc();
-    mappages(myproc()->pgdir, (char *)PGROUNDDOWN(rcr2()), PGSIZE, V2P(mem), PTE_W|PTE_U);
+    //Comprobamos de que no nos quedamos sin memoria
+    if(mem == 0){
+      cprintf("lazy alloc: out of memory\n");
+      myproc()->killed = 1;
+      myproc()->exitstatus = tf->trapno+1;
+      break;
+    }
+    //Limpiamos la página.
+    memset(mem, 0, PGSIZE);
+
+    //Ahora si que si, mapeamos con mappages.
+    //mappages en el que pasamos el procesos rcr2() = 4004
+    //mappages(myproc()->pgdir,(char *)PGROUNDDOWN(rcr2()), PGSIZE, V2P(mem), PTE_W|PTE_U);
+    //Tambien vamos a comprobar que mappages no falle. 
+    if(mappages(myproc()->pgdir, (char *)PGROUNDDOWN(va), PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
+      cprintf("lazy alloc: mappages failed\n");
+      kfree(mem);
+      myproc()->killed = 1;
+      myproc()->exitstatus = tf->trapno+1;
+      break;
+    }
+    
     break;
   //PAGEBREAK: 13
   default:
-  //myproc() == 0 es modo kernel. Si salta un trap en modo kernel -> panic = matar todos los procesos.
+    //myproc() == 0 es modo kernel. Si salta un trap en modo kernel -> panic = matar todos los procesos.
     if(myproc() == 0 || (tf->cs&3) == 0){
       // In kernel, it must be our mistake.
       cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
