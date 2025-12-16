@@ -146,6 +146,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->prio = 5;
+  p->next = 0;
 
   release(&ptable.lock);
 
@@ -207,7 +209,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
-
+  push(p);  // Insertamos el proceso en la cola correspondiente a su prioridad
   release(&ptable.lock);
 }
 
@@ -276,7 +278,8 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-
+  np->prio = curproc->prio;  // El proceso hijo hereda la prioridad del padre
+  push(np);  // Insertamos el nuevo proceso en la cola correspondiente a su prioridad
   release(&ptable.lock);
 
   return pid;
@@ -389,7 +392,6 @@ wait(int *status)
 void
 scheduler(void)
 {
-  struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
 /*    // Original
@@ -418,16 +420,13 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
-
   }
-
 */
   for(;;){
     // Enable interrupts on this processor.
     sti();
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-
     struct proc *p = 0;
     // Recorremos las colas de mayor a menor prioridad
     for(int i = 0; i < NPRIO; i++){
@@ -484,6 +483,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  push(myproc());  // Insertamos el proceso que cede la CPU en la cola correspondiente a su prioridad
   sched();
   release(&ptable.lock);
 }
@@ -557,8 +557,11 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      push(p);  // Insertamos el proceso despertado en la cola correspondiente a su prioridad
+    }
+    
 }
 
 // Wake up all processes sleeping on chan.
@@ -583,8 +586,11 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        push(p);  // Insertamos el proceso despertado en la cola correspondiente a su prioridad
+   
+      }
       release(&ptable.lock);
       return 0;
     }
