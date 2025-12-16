@@ -6,10 +6,23 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#define NPRIO 10  // Numero de colas
+/*
+struct {    //ORIGINAL
+  struct spinlock lock;   
+  struct proc proc[NPROC];
+} ptable;
+
+*/
+struct prioq{
+  struct proc *head; // Puntero al primero de la cola
+  struct proc *tail; // Puntero al ultimo de la cola
+};
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  struct prioq colas[NPRIO];
 } ptable;
 
 static struct proc *initproc;
@@ -20,10 +33,55 @@ extern void trapret(void);
 
 static void wakeup1(void *chan);
 
+
+/* 
+Insertar por el final un proceso en la cola correspondiente a su prioridad. Dos casos: Cola vacia y cola no 
+vacia. En el primero, se inserta como cabeza y cola, ya que como va a ser el único, será ambas cosas a la vez.
+En el segundo caso, simplemente se inserta al final, actualizando tambien el puntero next del antiguo tail.
+*/
+void 
+push(struct proc *p)
+{
+  int prioridadDelProceso = p->prio;
+  p->next = 0;  //Inicializa el puntero next a nulo
+  if(ptable.colas[prioridadDelProceso].tail){   // Caso cola no vacia
+    ptable.colas[prioridadDelProceso].tail->next = p; 
+  }else{                                        // Caso cola vacia   
+    ptable.colas[prioridadDelProceso].head = p;
+  }
+  ptable.colas[prioridadDelProceso].tail = p;
+}
+
+/*
+Quitar por el principio un proceso de la cola de la prioridad indicada. Si la cola esta vacia entonces devuelve nulo.
+Sino, entonces: 1- Actualiza la cabeza al siguiente proceso. 2- Si tras actualizar la cabeza, esta es nula, significa 
+que la cola se ha quedado vacia, entonces actualiza tambien el tail a nulo. 3- Limpia el puntero next del proceso que
+hemos sacado de la cola. 4- Devuelve el proceso sacado de la cola.
+*/
+struct proc* 
+pop(int prioridad)
+{
+  struct proc *p = ptable.colas[prioridad].head;
+  if(p){ //Si hay proceso
+    ptable.colas[prioridad].head = p->next; //Actualizar la cabeza
+    if(ptable.colas[prioridad].head == 0){ 
+      ptable.colas[prioridad].tail = 0; 
+    }
+    p->next = 0;
+    return p;
+  }else{  //Si no hay proceso
+    return 0;
+  }
+}
+
 void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  for(int i = 0; i < NPRIO; i++){ // Inicializamos las colas
+    ptable.colas[i].head = 0;
+    ptable.colas[i].tail = 0;
+  }
 }
 
 // Must be called with interrupts disabled
@@ -334,8 +392,8 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-
-  for(;;){
+/*    // Original
+ for(;;){
     // Enable interrupts on this processor.
     sti();
 
@@ -361,6 +419,36 @@ scheduler(void)
     }
     release(&ptable.lock);
 
+  }
+
+*/
+  for(;;){
+    // Enable interrupts on this processor.
+    sti();
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+
+    struct proc *p = 0;
+    // Recorremos las colas de mayor a menor prioridad
+    for(int i = 0; i < NPRIO; i++){
+      p = pop(i); // Sacamos el primer proceso de la cola i
+      if(p){      // Si hay proceso, salimos del bucle
+        break;
+      }
+    }
+    if(p){  // Si se ha salido del bucle porque ha encontrado un proceso entonces hacer todo lo que hacia el scheduler original
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&ptable.lock);
   }
 }
 
