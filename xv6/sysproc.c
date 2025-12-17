@@ -128,28 +128,18 @@ sys_getprio(void)
   int pid;
   if(argint(0, &pid) < 0)
     return -1;
-  
-  struct proc *p;
- // acquire(&ptable.lock);  // Hay que hacer una funcion en el kernel para q acceda a la ptable
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->pid == pid && p->state != UNUSED){
-      int prio = p->prio;
-      release(&ptable.lock);
-      return prio;
-    }
-  }
- // release(&ptable.lock);
-  return -1; // Si no se encuentra el proceso
+  return getprio(pid); // Si no se encuentra el proceso
 }
 
 int
 sys_setprio(void){
-  int pid, pr;
+  int pid;
+  int prioridad;
   if(argint(0, &pid) < 0)
     return -1;
-  if(argint(1, &pr) < 0)
+  if(argint(1, &prioridad) < 0)
     return -1;
-  if(pr < 0 || pr > 9)
+  if(prioridad < HIGHEST_PRIO || prioridad > LOWEST_PRIO)
     return -1; // Prioridad invalida
-
+  return setprio(pid, (uint) prioridad);
 }

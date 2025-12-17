@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "spinlock.h"
 #define NPRIO 10  // Numero de colas
+
 /*
 struct {    //ORIGINAL
   struct spinlock lock;   
@@ -42,7 +43,7 @@ En el segundo caso, simplemente se inserta al final, actualizando tambien el pun
 void 
 push(struct proc *p)
 {
-  int prioridadDelProceso = p->prio;
+  uint prioridadDelProceso = p->prio;
   p->next = 0;  //Inicializa el puntero next a nulo
   if(ptable.colas[prioridadDelProceso].tail){   // Caso cola no vacia
     ptable.colas[prioridadDelProceso].tail->next = p; 
@@ -59,7 +60,7 @@ que la cola se ha quedado vacia, entonces actualiza tambien el tail a nulo. 3- L
 hemos sacado de la cola. 4- Devuelve el proceso sacado de la cola.
 */
 struct proc* 
-pop(int prioridad)
+pop(uint prioridad)
 {
   struct proc *p = ptable.colas[prioridad].head;
   if(p){ //Si hay proceso
@@ -73,6 +74,32 @@ pop(int prioridad)
     return 0;
   }
 }
+
+void
+sacarDeCola(struct proc *p, uint prio)
+{
+  struct proc *head= ptable.colas[prio].head;
+  struct proc* anterior=0;
+  while(head){
+    if(head->pid == p->pid){
+      if(anterior){
+        anterior->next = head->next;
+      }else{
+        ptable.colas[prio].head = head->next;
+      }
+      if(ptable.colas[prio].tail == head){
+        ptable.colas[prio].tail = anterior;
+      }
+      head->next = 0; // Limpiamos el puntero next del proceso que vamos a reinsertar
+     // Insertamos el proceso en la cola correspondiente a su nueva prioridad
+      break;
+    }else{
+      anterior = head;
+      head = head->next;
+    }
+  }
+}
+
 
 void
 pinit(void)
@@ -146,7 +173,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->prio = 5;
+  p->prio = NORM_PRIO; // Inicializamos la prioridad del proceso a la normal
   p->next = 0;
 
   release(&ptable.lock);
@@ -330,6 +357,7 @@ exit(void)
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
+
   sched();
   panic("zombie exit");
 }
@@ -365,6 +393,7 @@ wait(int *status)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        p->next = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -394,34 +423,6 @@ scheduler(void)
 {
   struct cpu *c = mycpu();
   c->proc = 0;
-/*    // Original
- for(;;){
-    // Enable interrupts on this processor.
-    sti();
-
-    // Loop over process table looking for process to run.
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-    release(&ptable.lock);
-  }
-*/
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -634,4 +635,42 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+int
+getprio(int pid){
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid && p->state != UNUSED){
+      int prio = p->prio;
+      release(&ptable.lock);
+      return prio;
+    }
+  }
+ release(&ptable.lock);
+ return -1; // Si no se encuentra el proceso
+}
+
+int
+setprio(int pid, uint prio)
+{
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid && p->state != UNUSED){
+      uint prioAntigua = p->prio;
+      if(p->state == RUNNABLE){
+        // Si el proceso esta en la cola de su antigua prioridad, hay que sacarlo de ahi
+        sacarDeCola(p, prioAntigua);
+        p->prio = prio;
+        push(p); 
+      }else{
+        p->prio = prio;
+      }
+      release(&ptable.lock);
+      return 0;
+    }
+  }
+  release(&ptable.lock);
+  return -1; // PID no existe
 }
