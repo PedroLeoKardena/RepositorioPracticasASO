@@ -132,3 +132,25 @@ sys_date(void)
   cmostime(d);
   return 0;  
 }
+
+int
+sys_getprio(void)
+{
+  int pid;
+  if(argint(0, &pid) < 0)
+    return -1;
+  return getprio(pid); // Si no se encuentra el proceso
+}
+
+int
+sys_setprio(void){
+  int pid;
+  int prioridad;
+  if(argint(0, &pid) < 0)
+    return -1;
+  if(argint(1, &prioridad) < 0)
+    return -1;
+  if(prioridad < HIGHEST_PRIO || prioridad > LOWEST_PRIO)
+    return -1; // Prioridad invalida
+  return setprio(pid, (uint) prioridad);
+}

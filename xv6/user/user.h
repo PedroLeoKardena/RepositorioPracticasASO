@@ -25,6 +25,8 @@ extern int sleep(int);
 extern int uptime(void);
 extern int date(struct rtcdate*);
 extern int dup2(int oldfd, int newfd);
+extern int getprio(int pid);            
+extern int setprio(int pid, uint prio);
 
 // ulib.c
 extern int stat(const char*, struct stat*);
