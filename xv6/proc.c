@@ -76,12 +76,12 @@ pop(uint prioridad)
 }
 
 void
-sacarDeCola(struct proc *p, uint prio)
+sacarDeCola(int pid, uint prio)
 {
   struct proc *head= ptable.colas[prio].head;
   struct proc* anterior=0;
   while(head){
-    if(head->pid == p->pid){
+    if(head->pid == pid){
       if(anterior){
         anterior->next = head->next;
       }else{
@@ -661,7 +661,7 @@ setprio(int pid, uint prio)
       uint prioAntigua = p->prio;
       if(p->state == RUNNABLE){
         // Si el proceso esta en la cola de su antigua prioridad, hay que sacarlo de ahi
-        sacarDeCola(p, prioAntigua);
+        sacarDeCola(p->pid, prioAntigua);
         p->prio = prio;
         push(p); 
       }else{
